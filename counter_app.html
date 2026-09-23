@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimal & Modern Counter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      user-select: none;
+    }
+    
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+
+    .dark .glass-card {
+      background: rgba(24, 24, 27, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .count-bump {
+      animation: bump 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes bump {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.12); }
+      100% { transform: scale(1); }
+    }
+
+    /* Custom scrollbar for log history */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(156, 163, 175, 0.4);
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-100 dark:bg-zinc-950 text-slate-800 dark:text-zinc-100 min-h-screen flex flex-col items-center justify-between p-4 sm:p-6 transition-colors duration-300">
+
+  <header class="w-full max-w-lg flex items-center justify-between py-2 mb-2 sm:mb-4">
+    <div class="flex items-center space-x-2">
+      <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+        <i class="fa-solid fa-plus-minus text-lg"></i>
+      </div>
+      <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
+        PulseCount
+      </span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <!-- Mute Button -->
+      <button id="soundToggle" class="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition active:scale-95">
+        <i id="soundIcon" class="fa-solid fa-volume-high"></i>
+      </button>
+      <!-- Dark Mode Toggle -->
+      <button id="themeToggle" class="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800 transition active:scale-95">
+        <i id="themeIcon" class="fa-solid fa-moon"></i>
+      </button>
+    </div>
+  </header>
+
+  <main class="w-full max-w-lg flex flex-col gap-5 my-auto">
+    
+    <div class="glass-card rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden flex flex-col items-center text-center">
+      
+      <!-- Counter Badge / Status -->
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900 mb-2">
+        <span class="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+        <span id="counterStatus">Active Session</span>
+      </div>
+
+      <!-- Main Big Counter Display -->
+      <div class="relative my-4 flex items-center justify-center min-h-[120px]">
+        <h1 id="countDisplay" class="text-7xl sm:text-8xl font-extrabold tracking-tight text-slate-900 dark:text-white transition-all duration-100">
+          0
+        </h1>
+      </div>
+
+      <!-- Primary Action Buttons (+ / -) -->
+      <div class="grid grid-cols-2 gap-4 w-full mt-2">
+        <button id="btnDecrement" class="group relative py-5 sm:py-6 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 font-bold text-3xl flex items-center justify-center transition-all duration-150 active:scale-95 shadow-sm">
+          <i class="fa-solid fa-minus group-hover:scale-110 transition-transform"></i>
+        </button>
+
+        <button id="btnIncrement" class="group relative py-5 sm:py-6 rounded-2xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-3xl flex items-center justify-center transition-all duration-150 active:scale-95 shadow-lg shadow-indigo-500/25">
+          <i class="fa-solid fa-plus group-hover:scale-110 transition-transform"></i>
+        </button>
+      </div>
+
+      <!-- Step Controls -->
+      <div class="flex items-center justify-between w-full mt-6 pt-5 border-t border-slate-100 dark:border-zinc-800 text-sm">
+        <span class="text-slate-500 dark:text-zinc-400 font-medium">Step size:</span>
+        <div class="flex items-center gap-1.5 bg-slate-100 dark:bg-zinc-900 p-1 rounded-xl">
+          <button data-step="1" class="step-btn px-3 py-1 rounded-lg font-semibold text-xs transition bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-sm">1</button>
+          <button data-step="5" class="step-btn px-3 py-1 rounded-lg font-semibold text-xs transition text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white">5</button>
+          <button data-step="10" class="step-btn px-3 py-1 rounded-lg font-semibold text-xs transition text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white">10</button>
+          <button data-step="100" class="step-btn px-3 py-1 rounded-lg font-semibold text-xs transition text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white">100</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-card rounded-2xl p-5 shadow-sm flex flex-col gap-3">
+      <!-- Goal Progress -->
+      <div class="flex justify-between items-center text-sm font-medium">
+        <span class="text-slate-600 dark:text-zinc-400 flex items-center gap-2">
+          <i class="fa-solid fa-bullseye text-indigo-500"></i> Target Goal:
+          <input type="number" id="goalInput" value="50" min="1" class="w-16 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-center font-bold text-slate-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </span>
+        <span id="goalPercent" class="text-xs font-bold text-indigo-600 dark:text-indigo-400">0%</span>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="w-full bg-slate-200 dark:bg-zinc-800 h-2.5 rounded-full overflow-hidden">
+        <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-purple-500 h-full w-0 transition-all duration-300 rounded-full"></div>
+      </div>
+
+      <!-- Reset & Undo Actions -->
+      <div class="flex items-center justify-between pt-2">
+        <button id="btnUndo" class="text-xs font-semibold text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200 flex items-center gap-1.5 transition disabled:opacity-40" disabled>
+          <i class="fa-solid fa-rotate-left"></i> Undo
+        </button>
+
+        <button id="btnReset" class="text-xs font-semibold text-rose-500 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-arrows-rotate"></i> Reset Counter
+        </button>
+      </div>
+    </div>
+
+    <div class="glass-card rounded-2xl p-4 shadow-sm flex flex-col gap-2">
+      <div class="flex items-center justify-between text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider px-1">
+        <span>Activity Log</span>
+        <button id="btnClearLog" class="hover:text-rose-500 transition lowercase font-normal">clear</button>
+      </div>
+
+      <div id="logContainer" class="max-h-28 overflow-y-auto flex flex-col gap-1.5 text-xs text-slate-600 dark:text-zinc-300 pr-1">
+        <div class="text-slate-400 dark:text-zinc-500 italic text-center py-2">No history recorded yet</div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="w-full max-w-lg text-center mt-4 text-xs text-slate-400 dark:text-zinc-500">
+    <p class="hidden sm:block">
+      Shortcuts: <kbd class="px-1.5 py-0.5 bg-white dark:bg-zinc-800 rounded border border-slate-200 dark:border-zinc-700 font-mono shadow-2xs">Space</kbd> / <kbd class="px-1.5 py-0.5 bg-white dark:bg-zinc-800 rounded border border-slate-200 dark:border-zinc-700 font-mono shadow-2xs">↑</kbd> Add • <kbd class="px-1.5 py-0.5 bg-white dark:bg-zinc-800 rounded border border-slate-200 dark:border-zinc-700 font-mono shadow-2xs">↓</kbd> Subtract • <kbd class="px-1.5 py-0.5 bg-white dark:bg-zinc-800 rounded border border-slate-200 dark:border-zinc-700 font-mono shadow-2xs">R</kbd> Reset
+    </p>
+  </footer>
+
+  <!-- Modal Toast Notification -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-medium shadow-2xl opacity-0 pointer-events-none transition-all duration-200 flex items-center gap-2">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 dark:text-emerald-600"></i>
+    <span id="toastMessage">Action performed</span>
+  </div>
+
+  <script>
+    // State
+    let count = 0;
+    let step = 1;
+    let goal = 50;
+    let history = [];
+    let previousState = null;
+    let isMuted = false;
+    let goalReachedTriggered = false;
+
+    // DOM Elements
+    const countDisplay = document.getElementById('countDisplay');
+    const btnIncrement = document.getElementById('btnIncrement');
+    const btnDecrement = document.getElementById('btnDecrement');
+    const btnReset = document.getElementById('btnReset');
+    const btnUndo = document.getElementById('btnUndo');
+    const goalInput = document.getElementById('goalInput');
+    const progressBar = document.getElementById('progressBar');
+    const goalPercent = document.getElementById('goalPercent');
+    const logContainer = document.getElementById('logContainer');
+    const btnClearLog = document.getElementById('btnClearLog');
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    const soundToggle = document.getElementById('soundToggle');
+    const soundIcon = document.getElementById('soundIcon');
+    const stepBtns = document.querySelectorAll('.step-btn');
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+      if (isMuted) return;
+      try {
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+
+        if (type === 'inc') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'dec') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(520, now);
+          osc.frequency.exponentialRampToValueAtTime(260, now + 0.08);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'reset') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.linearRampToValueAtTime(150, now + 0.15);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        } else if (type === 'goal') {
+          // Play fanfare
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const o = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            o.connect(g);
+            g.connect(audioCtx.destination);
+            o.type = 'triangle';
+            o.frequency.value = freq;
+            g.gain.setValueAtTime(0.1, now + idx * 0.1);
+            g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.1 + 0.2);
+            o.start(now + idx * 0.1);
+            o.stop(now + idx * 0.1 + 0.2);
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function updateUI() {
+      // Update Big Number
+      countDisplay.textContent = count;
+
+      // Animate Bump
+      countDisplay.classList.remove('count-bump');
+      void countDisplay.offsetWidth; // Trigger reflow
+      countDisplay.classList.add('count-bump');
+
+      // Update Goal Progress
+      const pct = Math.min(100, Math.max(0, Math.round((count / goal) * 100)));
+      progressBar.style.width = `${pct}%`;
+      goalPercent.textContent = `${pct}%`;
+
+      // Goal Celebration
+      if (count >= goal && !goalReachedTriggered && goal > 0) {
+        goalReachedTriggered = true;
+        playSound('goal');
+        if (typeof confetti === 'function') {
+          confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { y: 0.7 }
+          });
+        }
+        showToast('🎯 Goal reached! Awesome job!');
+      } else if (count < goal) {
+        goalReachedTriggered = false;
+      }
+
+      // Enable/Disable Undo
+      btnUndo.disabled = previousState === null;
+
+      // Render History Log
+      renderLog();
+
+      // Save Local Storage
+      localStorage.setItem('pulse_count', count);
+      localStorage.setItem('pulse_step', step);
+      localStorage.setItem('pulse_goal', goal);
+      localStorage.setItem('pulse_log', JSON.stringify(history));
+    }
+
+    function addLogEntry(action, changeVal) {
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      history.unshift({ action, changeVal, time, result: count });
+      if (history.length > 20) history.pop();
+    }
+
+    function renderLog() {
+      if (history.length === 0) {
+        logContainer.innerHTML = '<div class="text-slate-400 dark:text-zinc-500 italic text-center py-2">No history recorded yet</div>';
+        return;
+      }
+
+      logContainer.innerHTML = history.map((item) => {
+        let isPositive = item.changeVal > 0;
+        let badgeColor = isPositive 
+          ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400' 
+          : item.changeVal < 0 
+          ? 'text-rose-600 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-400' 
+          : 'text-slate-600 bg-slate-100 dark:bg-zinc-800 dark:text-zinc-300';
+
+        let formattedVal = item.changeVal > 0 ? `+${item.changeVal}` : item.changeVal;
+
+        return `
+          <div class="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 dark:bg-zinc-900/50">
+            <div class="flex items-center gap-2">
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${badgeColor}">
+                ${formattedVal}
+              </span>
+              <span class="font-medium">${item.action}</span>
+            </div>
+            <div class="flex items-center gap-2 text-[11px] text-slate-400 dark:text-zinc-500">
+              <span>Total: ${item.result}</span>
+              <span>•</span>
+              <span>${item.time}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMessage = document.getElementById('toastMessage');
+      toastMessage.textContent = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2500);
+    }
+
+    function recordStateForUndo() {
+      previousState = { count, history: [...history] };
+    }
+
+    function increment() {
+      recordStateForUndo();
+      count += step;
+      playSound('inc');
+      addLogEntry('Increment', step);
+      updateUI();
+    }
+
+    function decrement() {
+      recordStateForUndo();
+      count -= step;
+      playSound('dec');
+      addLogEntry('Decrement', -step);
+      updateUI();
+    }
+
+    function reset() {
+      if (count === 0) return;
+      recordStateForUndo();
+      count = 0;
+      playSound('reset');
+      addLogEntry('Reset', 0);
+      showToast('Counter reset to 0');
+      updateUI();
+    }
+
+    function undo() {
+      if (!previousState) return;
+      count = previousState.count;
+      history = previousState.history;
+      previousState = null;
+      playSound('dec');
+      showToast('Action undone');
+      updateUI();
+    }
+
+    // Button Listeners
+    btnIncrement.addEventListener('click', increment);
+    btnDecrement.addEventListener('click', decrement);
+    btnReset.addEventListener('click', reset);
+    btnUndo.addEventListener('click', undo);
+
+    btnClearLog.addEventListener('click', () => {
+      history = [];
+      renderLog();
+      localStorage.setItem('pulse_log', JSON.stringify([]));
+      showToast('History log cleared');
+    });
+
+    // Step Selector buttons
+    stepBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        step = parseInt(e.target.dataset.step, 10);
+        stepBtns.forEach(b => {
+          b.className = 'step-btn px-3 py-1 rounded-lg font-semibold text-xs transition text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white';
+        });
+        e.target.className = 'step-btn px-3 py-1 rounded-lg font-semibold text-xs transition bg-white dark:bg-zinc-800 text-indigo-600 dark:text-indigo-400 shadow-sm';
+      });
+    });
+
+    // Goal input change
+    goalInput.addEventListener('change', (e) => {
+      const val = parseInt(e.target.value, 10);
+      if (!isNaN(val) && val > 0) {
+        goal = val;
+        goalReachedTriggered = count >= goal;
+        updateUI();
+      }
+    });
+
+    // Theme Toggle
+    themeToggle.addEventListener('click', () => {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      themeIcon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+      localStorage.setItem('pulse_theme', isDark ? 'dark' : 'light');
+    });
+
+    // Sound Toggle
+    soundToggle.addEventListener('click', () => {
+      isMuted = !isMuted;
+      soundIcon.className = isMuted ? 'fa-solid fa-volume-xmark text-rose-500' : 'fa-solid fa-volume-high';
+      showToast(isMuted ? 'Sound muted' : 'Sound enabled');
+    });
+
+    window.addEventListener('keydown', (e) => {
+      // Avoid hotkeys when typing in goal input
+      if (document.activeElement.tagName === 'INPUT') return;
+
+      if (e.code === 'Space' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        increment();
+      } else if (e.key === 'ArrowDown' || e.key === '-') {
+        e.preventDefault();
+        decrement();
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        reset();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        e.preventDefault();
+        undo();
+      }
+    });
+
+    // Initial load from Local Storage
+    window.addEventListener('DOMContentLoaded', () => {
+      const savedCount = localStorage.getItem('pulse_count');
+      const savedStep = localStorage.getItem('pulse_step');
+      const savedGoal = localStorage.getItem('pulse_goal');
+      const savedLog = localStorage.getItem('pulse_log');
+      const savedTheme = localStorage.getItem('pulse_theme');
+
+      if (savedCount !== null) count = parseInt(savedCount, 10);
+      if (savedStep !== null) {
+        step = parseInt(savedStep, 10);
+        stepBtns.forEach(b => {
+          if (parseInt(b.dataset.step, 10) === step) {
+            b.click();
+          }
+        });
+      }
+      if (savedGoal !== null) {
+        goal = parseInt(savedGoal, 10);
+        goalInput.value = goal;
+      }
+      if (savedLog) {
+        try { history = JSON.parse(savedLog); } catch (e) {}
+      }
+
+      if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+        themeIcon.className = 'fa-solid fa-sun';
+      }
+
+      updateUI();
+    });
+  </script>
+</body>
+</html>
